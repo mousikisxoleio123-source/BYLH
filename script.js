@@ -139,15 +139,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 <h4>Υλικό Μαθήματος</h4>
                 <ul>
-                    ${Object.keys(lesson.content).map(key => `
-                        <li>
-                            <strong>${key}:</strong>
-                            <p>${lesson.content[key].title}</p>
-                            ${lesson.content[key].description ? `<p>${lesson.content[key].description}</p>` : ''}
-                            ${lesson.content[key].link ? `<a href="${lesson.content[key].link}" target="_blank">Άνοιγμα Συνδέσμου</a>` : ''}
-                        </li>
-                    `).join('')}
+                    ${Object.keys(lesson.content).map(key => {
+                        const content = lesson.content[key];
+                        return `
+                            <li>
+                                <strong>${key}</strong> ${content.isDone ? '✅' : '⬜'} 
+                                <p>${content.title}</p>
+                                ${content.description ? `<p>${content.description}</p>` : ''}
+                                ${content.link ? `<a href="${content.link}" target="_blank">Άνοιγμα Συνδέσμου</a>` : ''}
+                            </li>
+                        `;
+                    }).join('')}
                 </ul>
+                
+                ${lesson.notes && lesson.notes.trim() !== '' ? `
+                    <div class="notes-section">
+                        <h4>Παρατηρήσεις</h4>
+                        <p class="notes-text">${lesson.notes.replace(/\n/g, '<br>')}</p>
+                    </div>
+                ` : ''}
 
                 <div class="actions">
                     <button id="edit-lesson" data-index="${lessonIndex}">Επεξεργασία</button>
@@ -189,23 +199,35 @@ document.addEventListener('DOMContentLoaded', () => {
                             <label for="lesson-description">Περιγραφή</label>
                             <textarea id="lesson-description" rows="4" required>${lessonToEdit ? lessonToEdit.description : ''}</textarea>
                         </div>
-                    </div>
+
+                        <div class="form-group">
+                            <label for="lesson-notes">Παρατηρήσεις</label>
+                            <textarea id="lesson-notes" rows="6">${lessonToEdit ? (lessonToEdit.notes || '') : ''}</textarea>
+                        </div>
+                        </div>
 
                     <div class="form-section">
                         <h3 class="form-section-title">Υλικό Μαθήματος</h3>
-                        ${itemsList.map(item => { // Χρήση της δυναμικής λίστας
+                        ${itemsList.map(item => { 
                             const safeItem = item.replace(/\s/g, '-');
-                            const content = lessonToEdit && lessonToEdit.content && lessonToEdit.content[item] ? lessonToEdit.content[item] : { title: '', description: '', link: '' };
+                            // Προσθήκη isDone στη δομή, με default false
+                            const content = lessonToEdit && lessonToEdit.content && lessonToEdit.content[item] 
+                                ? lessonToEdit.content[item] 
+                                : { title: '', description: '', link: '', isDone: false }; 
+                                
                             const imagePath = `images/${imageMap[item]}`;
-                            
-                            // Λογική εμφάνισης/απόκρυψης κουμπιού Επικόλλησης
                             const showPasteButton = safeItem === copiedContentItem && copiedContentData; 
+                            const isChecked = content.isDone ? 'checked' : ''; // Έλεγχος κατάστασης
                             
                             return `
                                 <div class="content-box" data-item="${safeItem}">
                                     <div class="content-box-header">
                                         <img src="${imagePath}" alt="${item} icon" class="content-icon">
                                         <h4>${item}</h4>
+                                        <div class="content-checkbox-container">
+                                            <input type="checkbox" id="${safeItem}-done" ${isChecked}>
+                                            <label for="${safeItem}-done">Ολοκληρώθηκε</label>
+                                        </div>
                                         <div class="form-actions-top">
                                             ${showPasteButton ? 
                                                 `<button type="button" class="small-button paste-content-button" data-safe-item="${safeItem}">Επικόλληση</button>` 
@@ -318,6 +340,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 date: document.getElementById('lesson-date').value,
                 lessonTitle: document.getElementById('lesson-title').value,
                 description: document.getElementById('lesson-description').value,
+                notes: document.getElementById('lesson-notes').value.trim(), // ΝΕΟ: Προσθήκη πεδίου Παρατηρήσεων
                 content: {}
             };
             
@@ -329,8 +352,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const title = document.getElementById(`${safeItem}-title`).value;
                 const description = document.getElementById(`${safeItem}-description`).value;
                 const link = document.getElementById(`${safeItem}-link`).value;
-                if (title.trim() !== '' || description.trim() !== '' || link.trim() !== '') {
-                    newLesson.content[item] = { title, description, link };
+                const isDone = document.getElementById(`${safeItem}-done`).checked; // ΝΕΟ: Προσθήκη κατάστασης checkbox
+                
+                // Αποθήκευση μόνο αν υπάρχει κάποιο δεδομένο (τίτλος, περιγραφή, link ή isDone=true)
+                if (title.trim() !== '' || description.trim() !== '' || link.trim() !== '' || isDone) { 
+                    newLesson.content[item] = { title, description, link, isDone }; // Αποθήκευση και του isDone
                 }
             });
             
@@ -360,10 +386,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         txtContent += `Ημερομηνία: ${lesson.date}\n`;
                         txtContent += `Τίτλος: ${lesson.lessonTitle}\n`;
                         txtContent += `Περιγραφή: ${lesson.description}\n`;
+                        txtContent += `Παρατηρήσεις: ${lesson.notes || ''}\n`; // ΝΕΟ: Εξαγωγή Παρατηρήσεων
                         txtContent += `\nΥλικό Μαθήματος:\n`;
                         for (const item in lesson.content) {
                             if (lesson.content.hasOwnProperty(item)) {
                                 txtContent += `  - ${item}:\n`;
+                                txtContent += `    Ολοκληρώθηκε: ${lesson.content[item].isDone ? 'ΝΑΙ' : 'ΟΧΙ'}\n`; // ΝΕΟ: Εξαγωγή isDone
                                 txtContent += `    Τίτλος: ${lesson.content[item].title}\n`;
                                 txtContent += `    Περιγραφή: ${lesson.content[item].description}\n`;
                                 txtContent += `    Link: ${lesson.content[item].link}\n`;
@@ -399,6 +427,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (confirm('ΠΡΟΣΟΧΗ: Η εισαγωγή θα συγχωνεύσει τα νέα δεδομένα με τα υπάρχοντα. Είστε σίγουροι ότι θέλετε να συνεχίσετε;')) {
                     for (const className in newData) {
                         if (Array.isArray(newData[className])) {
+                            // Διασφάλιση ότι υπάρχει ο πίνακας για την τάξη
+                            if (!data[className]) data[className] = [];
+                            
                             newData[className].forEach(lesson => {
                                 const exists = data[className].some(existingLesson => 
                                     existingLesson.lessonTitle === lesson.lessonTitle && 
@@ -455,12 +486,15 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (trimmedLine.startsWith('-----------------------------------------')) {
                 if (currentLesson && currentLesson.lessonTitle && currentLesson.date) {
+                    // Διασφάλιση ότι το notes είναι string (αν και το trim το κάνει)
+                    currentLesson.notes = currentLesson.notes || '';
                     parsedData[currentClass].push(currentLesson);
                 }
                 currentLesson = {
                     date: '',
                     lessonTitle: '',
                     description: '',
+                    notes: '', // ΝΕΟ: Αρχικοποίηση Παρατηρήσεων
                     content: {}
                 };
                 currentContentItem = '';
@@ -475,6 +509,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentLesson.lessonTitle = trimmedLine.replace('Τίτλος:', '').trim();
             } else if (trimmedLine.startsWith('Περιγραφή:') && !currentContentItem) {
                 currentLesson.description = trimmedLine.replace('Περιγραφή:', '').trim();
+            } else if (trimmedLine.startsWith('Παρατηρήσεις:')) { // ΝΕΟ: Ανάλυση Παρατηρήσεων
+                currentLesson.notes = trimmedLine.replace('Παρατηρήσεις:', '').trim();
             } else if (trimmedLine.startsWith('Υλικό Μαθήματος:')) {
                 currentContentItem = '';
             } else if (trimmedLine.startsWith('-')) {
@@ -485,11 +521,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     currentLesson.content[currentContentItem] = {
                         title: '',
                         description: '',
-                        link: ''
+                        link: '',
+                        isDone: false // ΝΕΟ: Αρχικοποίηση isDone
                     };
                 }
             } else if (currentContentItem) {
-                if (trimmedLine.startsWith('Τίτλος:')) {
+                if (trimmedLine.startsWith('Ολοκληρώθηκε:')) { // ΝΕΟ: Ανάλυση isDone
+                    const isDoneValue = trimmedLine.replace('Ολοκληρώθηκε:', '').trim().toUpperCase();
+                    currentLesson.content[currentContentItem].isDone = isDoneValue === 'ΝΑΙ';
+                } else if (trimmedLine.startsWith('Τίτλος:')) {
                     currentLesson.content[currentContentItem].title = trimmedLine.replace('Τίτλος:', '').trim();
                 } else if (trimmedLine.startsWith('Περιγραφή:')) {
                     currentLesson.content[currentContentItem].description = trimmedLine.replace('Περιγραφή:', '').trim();
@@ -500,6 +540,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         if (currentClass && currentLesson && currentLesson.lessonTitle && currentLesson.date) {
+            currentLesson.notes = currentLesson.notes || ''; // Διασφάλιση
             parsedData[currentClass].push(currentLesson);
         }
 
@@ -511,11 +552,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const title = document.getElementById(`${safeItem}-title`).value;
         const description = document.getElementById(`${safeItem}-description`).value;
         const link = document.getElementById(`${safeItem}-link`).value;
+        const isDone = document.getElementById(`${safeItem}-done`).checked; // ΝΕΟ: Αντιγραφή και του isDone
 
         const contentObject = {
             title: title,
             description: description,
-            link: link
+            link: link,
+            isDone: isDone // ΝΕΟ: Αποθήκευση isDone
         };
         
         copiedContentItem = safeItem; 
@@ -550,10 +593,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     const titleInput = document.getElementById(`${safeItem}-title`);
                     const descriptionInput = document.getElementById(`${safeItem}-description`);
                     const linkInput = document.getElementById(`${safeItem}-link`);
+                    const doneCheckbox = document.getElementById(`${safeItem}-done`); // ΝΕΟ: Επικόλληση isDone
 
                     if (titleInput) titleInput.value = contentObject.title || '';
                     if (descriptionInput) descriptionInput.value = contentObject.description || '';
                     if (linkInput) linkInput.value = contentObject.link || '';
+                    if (doneCheckbox) doneCheckbox.checked = contentObject.isDone || false; // ΝΕΟ: Εφαρμογή isDone
                     
                     copiedContentItem = ''; 
                     copiedContentData = ''; 
@@ -582,6 +627,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById(`${safeItem}-title`).value = '';
             document.getElementById(`${safeItem}-description`).value = '';
             document.getElementById(`${safeItem}-link`).value = '';
+            document.getElementById(`${safeItem}-done`).checked = false; // ΝΕΟ: Μηδενισμός του checkbox
         }
     }
 
